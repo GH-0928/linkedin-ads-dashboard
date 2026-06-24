@@ -463,9 +463,10 @@ if len(date_range) == 2:
     period_len = (end - start).days + 1
     prev_end = start - pd.Timedelta(days=1)
     prev_start = prev_end - pd.Timedelta(days=period_len - 1)
+    # pd.Timedelta 與 date 相減回傳 date,不要 .date()
     df_prev_all = df_raw[
-        (df_raw["日期"].dt.date >= prev_start.date())
-        & (df_raw["日期"].dt.date <= prev_end.date())
+        (df_raw["日期"].dt.date >= prev_start)
+        & (df_raw["日期"].dt.date <= prev_end)
     ]
 
 if not df_all.empty:
