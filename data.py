@@ -44,6 +44,8 @@ def load_rawdata() -> pd.DataFrame:
     result = svc.spreadsheets().values().get(
         spreadsheetId=SHEET_ID,
         range=f"{RAWDATA_TAB}!A:M",
+        valueRenderOption="UNFORMATTED_VALUE",
+        dateTimeRenderOption="FORMATTED_STRING",
     ).execute()
     values = result.get("values", [])
     if not values:
