@@ -47,6 +47,7 @@ def _kpi_pack(df: pd.DataFrame) -> dict:
         "ctr": clicks / imp * 100 if imp > 0 else 0,
         "eng_rate": eng / imp * 100 if imp > 0 else 0,
         "cpm": df["CPM"].mean() if "CPM" in df.columns and len(df) else 0,
+        "cpc": spent / clicks if clicks > 0 else 0,
         "cpf": spent / follows if follows > 0 else 0,
         "cpe": spent / eng if eng > 0 else 0,
     }
@@ -118,8 +119,10 @@ def _compute_sparklines(df: pd.DataFrame) -> dict:
     d["ctr"] = (d["clicks"] / d["imp"] * 100).fillna(0)
     d["eng_rate"] = (d["eng"] / d["imp"] * 100).fillna(0)
     d["cpe"] = (d["spent"] / d["eng"]).replace([float("inf"), float("-inf")], 0).fillna(0)
+    d["cpc"] = (d["spent"] / d["clicks"]).replace([float("inf"), float("-inf")], 0).fillna(0)
     d["cpf"] = (d["spent"] / d["follows"]).replace([float("inf"), float("-inf")], 0).fillna(0)
-    keys = ["spent", "imp", "clicks", "reach", "cpm", "ctr", "eng_rate", "cpe", "follows", "cpf"]
+    keys = ["spent", "imp", "clicks", "eng", "reach", "cpm", "cpc",
+            "ctr", "eng_rate", "cpe", "follows", "cpf"]
     return {k: d[k].tolist() for k in keys if k in d.columns}
 
 
@@ -177,7 +180,7 @@ def show_kpis(df: pd.DataFrame, df_prev: pd.DataFrame = None) -> None:
             f'</div>'
         )
 
-    # ── 規模指標 ───────────────────────────────────────
+    # ── 規模指標(淺藍底)── 絕對量,越高越好 ────────────
     st.markdown('<div class="kpi-section">💵 規模指標</div>', unsafe_allow_html=True)
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.markdown(render("💰 總花費", f"${curr['spent']:,.0f}", "spent", "vol",
@@ -186,25 +189,24 @@ def show_kpis(df: pd.DataFrame, df_prev: pd.DataFrame = None) -> None:
                        color="#1D4ED8"), unsafe_allow_html=True)
     c3.markdown(render("🖱️ 總點擊", f"{curr['clicks']:,.0f}", "clicks", "vol",
                        color="#1D4ED8"), unsafe_allow_html=True)
-    c4.markdown(render("👥 觸及人數", f"{curr['reach']:,.0f}", "reach", "vol",
+    c4.markdown(render("💬 總互動", f"{curr['eng']:,.0f}", "eng", "vol",
                        color="#1D4ED8"), unsafe_allow_html=True)
-    c5.markdown(render("📡 平均CPM", f"${curr['cpm']:.2f}", "cpm", "cost",
-                       inverse=True, color="#D97706"), unsafe_allow_html=True)
+    c5.markdown(render("➕ 追蹤數", f"{curr['follows']:,.0f}", "follows", "vol",
+                       color="#1D4ED8"), unsafe_allow_html=True)
 
-    # ── 效率指標 ───────────────────────────────────────
+    # ── 效率指標(淺黃底)── 單位成本/比率,成本類越低越好 ─
     st.markdown('<div class="kpi-section">🎯 效率指標</div>', unsafe_allow_html=True)
     c6, c7, c8, c9, c10 = st.columns(5)
-    c6.markdown(render("📣 CTR", f"{curr['ctr']:.2f}%", "ctr", "rate",
+    c6.markdown(render("🖱️ 平均CPC", f"${curr['cpc']:.2f}" if curr['cpc'] > 0 else "—",
+                       "cpc", "rate", inverse=True, color="#A16207"), unsafe_allow_html=True)
+    c7.markdown(render("📡 平均CPM", f"${curr['cpm']:.2f}", "cpm", "rate",
+                       inverse=True, color="#A16207"), unsafe_allow_html=True)
+    c8.markdown(render("📣 CTR", f"{curr['ctr']:.2f}%", "ctr", "rate",
                        color="#A16207"), unsafe_allow_html=True)
-    c7.markdown(render("❤️ 互動率", f"{curr['eng_rate']:.2f}%", "eng_rate", "rate",
+    c9.markdown(render("❤️ 互動率", f"{curr['eng_rate']:.2f}%", "eng_rate", "rate",
                        color="#A16207"), unsafe_allow_html=True)
-    c8.markdown(render("💬 CPE", f"${curr['cpe']:.2f}" if curr['cpe'] > 0 else "—",
-                       "cpe", "cost", inverse=True, color="#D97706"),
-                unsafe_allow_html=True)
-    c9.markdown(render("➕ 追蹤數", f"{curr['follows']:,.0f}", "follows", "vol",
-                       color="#1D4ED8"), unsafe_allow_html=True)
     c10.markdown(render("💎 CPF", f"${curr['cpf']:.2f}" if curr['cpf'] > 0 else "—",
-                        "cpf", "cost", inverse=True, color="#D97706"),
+                        "cpf", "rate", inverse=True, color="#A16207"),
                  unsafe_allow_html=True)
 
 
