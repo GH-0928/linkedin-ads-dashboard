@@ -72,30 +72,134 @@ def _delta_text(curr: float, prev: float, unit: str = "", inverse: bool = False)
     return text, color
 
 
+def _sparkline_svg(values: list, color: str = "#0077B5") -> str:
+    """產生小型內嵌 SVG 折線圖,給 KPI 卡用。"""
+    if not values or len(values) < 2:
+        return ""
+    width, height, pad = 100, 28, 3
+    min_v, max_v = min(values), max(values)
+    if max_v == min_v:
+        max_v = min_v + 1
+    pts = []
+    for i, v in enumerate(values):
+        x = i * width / (len(values) - 1)
+        y = height - pad - (v - min_v) / (max_v - min_v) * (height - 2 * pad)
+        pts.append(f"{x:.1f},{y:.1f}")
+    last_x = (len(values) - 1) * width / (len(values) - 1)
+    last_y = float(pts[-1].split(",")[1])
+    return (
+        f'<svg width="{width}" height="{height}" '
+        f'style="display:block;margin-top:6px;opacity:0.75">'
+        f'<polyline points="{" ".join(pts)}" stroke="{color}" stroke-width="1.6" '
+        f'fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="2.2" fill="{color}"/>'
+        f'</svg>'
+    )
+
+
+def _compute_sparklines(df: pd.DataFrame) -> dict:
+    """取期間中最後 7 天,計算每個 KPI 的每日值,給 sparkline 用。"""
+    if df.empty:
+        return {}
+    max_d = df["日期"].max()
+    min_d = max_d - pd.Timedelta(days=6)
+    df7 = df[df["日期"] >= min_d]
+    if df7.empty:
+        return {}
+    d = df7.groupby("日期").agg(
+        spent=("花費", "sum"),
+        imp=("曝光", "sum"),
+        clicks=("點擊", "sum"),
+        reach=("觸及", "sum"),
+        eng=("互動", "sum"),
+        follows=("追蹤", "sum"),
+        cpm=("CPM", "mean"),
+    ).sort_index()
+    d["ctr"] = (d["clicks"] / d["imp"] * 100).fillna(0)
+    d["eng_rate"] = (d["eng"] / d["imp"] * 100).fillna(0)
+    d["cpe"] = (d["spent"] / d["eng"]).replace([float("inf"), float("-inf")], 0).fillna(0)
+    d["cpf"] = (d["spent"] / d["follows"]).replace([float("inf"), float("-inf")], 0).fillna(0)
+    keys = ["spent", "imp", "clicks", "reach", "cpm", "ctr", "eng_rate", "cpe", "follows", "cpf"]
+    return {k: d[k].tolist() for k in keys if k in d.columns}
+
+
+_KPI_CSS = """
+<style>
+.kpi-card{
+    background:#fff;border:1px solid #E5E7EB;border-radius:10px;
+    padding:14px 16px;margin-bottom:10px;min-height:138px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04);
+}
+.kpi-vol{background:#F0F7FF;border-color:#CFE2F8}      /* 規模 / 量體 */
+.kpi-rate{background:#FFFBEB;border-color:#F4E5B8}     /* 比率 */
+.kpi-cost{background:#FFF4EE;border-color:#F8D2BC}     /* 成本(越低越好)*/
+.kpi-label{font-size:12.5px;color:#5C6470;margin-bottom:4px;letter-spacing:0.2px}
+.kpi-value{font-size:24px;font-weight:600;color:#1F2937;line-height:1.15}
+.kpi-delta{font-size:11.5px;margin-top:5px;font-weight:500}
+.kpi-up-good{color:#15803D}     /* 數字上升且是好事 */
+.kpi-down-good{color:#B91C1C}   /* 數字下降但是壞事 */
+.kpi-up-bad{color:#B91C1C}      /* 數字上升但是壞事(如成本)*/
+.kpi-down-bad{color:#15803D}    /* 數字下降但是好事(如成本)*/
+.kpi-section{font-size:14.5px;font-weight:600;margin:14px 0 6px 0;color:#374151}
+</style>
+"""
+
+
 def show_kpis(df: pd.DataFrame, df_prev: pd.DataFrame = None) -> None:
     curr = _kpi_pack(df)
     prev = _kpi_pack(df_prev) if df_prev is not None and not df_prev.empty else None
+    sparks = _compute_sparklines(df)
 
-    def _m(col, label, value, key, inverse=False):
-        if prev:
-            delta, color = _delta_text(curr[key], prev[key], inverse=inverse)
-            col.metric(label, value, delta=delta, delta_color=color)
-        else:
-            col.metric(label, value)
+    st.markdown(_KPI_CSS, unsafe_allow_html=True)
 
+    def render(label, value, key, category, inverse=False, color="#0077B5"):
+        delta_html = ""
+        if prev and prev.get(key):
+            pct = (curr[key] - prev[key]) / prev[key] * 100
+            arrow = "↑" if pct >= 0 else "↓"
+            sign = "+" if pct >= 0 else ""
+            is_up = pct >= 0
+            cls = ("kpi-up-bad" if is_up else "kpi-down-bad") if inverse else \
+                  ("kpi-up-good" if is_up else "kpi-down-good")
+            delta_html = f'<div class="kpi-delta {cls}">{arrow} {sign}{pct:.1f}% vs 上期</div>'
+        spark_html = _sparkline_svg(sparks.get(key, []), color=color)
+        return (
+            f'<div class="kpi-card kpi-{category}">'
+            f'<div class="kpi-label">{label}</div>'
+            f'<div class="kpi-value">{value}</div>'
+            f'{delta_html}{spark_html}'
+            f'</div>'
+        )
+
+    # ── 規模指標 ───────────────────────────────────────
+    st.markdown('<div class="kpi-section">💵 規模指標</div>', unsafe_allow_html=True)
     c1, c2, c3, c4, c5 = st.columns(5)
-    _m(c1, "💰 總花費", f"${curr['spent']:,.0f}", "spent")
-    _m(c2, "👁️ 總曝光", f"{curr['imp']:,.0f}", "imp")
-    _m(c3, "🖱️ 總點擊", f"{curr['clicks']:,.0f}", "clicks")
-    _m(c4, "👥 觸及人數", f"{curr['reach']:,.0f}", "reach")
-    _m(c5, "📡 平均CPM", f"${curr['cpm']:.2f}", "cpm", inverse=True)
+    c1.markdown(render("💰 總花費", f"${curr['spent']:,.0f}", "spent", "vol",
+                       color="#1D4ED8"), unsafe_allow_html=True)
+    c2.markdown(render("👁️ 總曝光", f"{curr['imp']:,.0f}", "imp", "vol",
+                       color="#1D4ED8"), unsafe_allow_html=True)
+    c3.markdown(render("🖱️ 總點擊", f"{curr['clicks']:,.0f}", "clicks", "vol",
+                       color="#1D4ED8"), unsafe_allow_html=True)
+    c4.markdown(render("👥 觸及人數", f"{curr['reach']:,.0f}", "reach", "vol",
+                       color="#1D4ED8"), unsafe_allow_html=True)
+    c5.markdown(render("📡 平均CPM", f"${curr['cpm']:.2f}", "cpm", "cost",
+                       inverse=True, color="#D97706"), unsafe_allow_html=True)
 
+    # ── 效率指標 ───────────────────────────────────────
+    st.markdown('<div class="kpi-section">🎯 效率指標</div>', unsafe_allow_html=True)
     c6, c7, c8, c9, c10 = st.columns(5)
-    _m(c6, "📣 CTR", f"{curr['ctr']:.2f}%", "ctr")
-    _m(c7, "❤️ 互動率", f"{curr['eng_rate']:.2f}%", "eng_rate")
-    _m(c8, "💬 CPE", f"${curr['cpe']:.2f}" if curr['cpe'] > 0 else "—", "cpe", inverse=True)
-    _m(c9, "➕ 追蹤數", f"{curr['follows']:,.0f}", "follows")
-    _m(c10, "💎 CPF", f"${curr['cpf']:.2f}" if curr['cpf'] > 0 else "—", "cpf", inverse=True)
+    c6.markdown(render("📣 CTR", f"{curr['ctr']:.2f}%", "ctr", "rate",
+                       color="#A16207"), unsafe_allow_html=True)
+    c7.markdown(render("❤️ 互動率", f"{curr['eng_rate']:.2f}%", "eng_rate", "rate",
+                       color="#A16207"), unsafe_allow_html=True)
+    c8.markdown(render("💬 CPE", f"${curr['cpe']:.2f}" if curr['cpe'] > 0 else "—",
+                       "cpe", "cost", inverse=True, color="#D97706"),
+                unsafe_allow_html=True)
+    c9.markdown(render("➕ 追蹤數", f"{curr['follows']:,.0f}", "follows", "vol",
+                       color="#1D4ED8"), unsafe_allow_html=True)
+    c10.markdown(render("💎 CPF", f"${curr['cpf']:.2f}" if curr['cpf'] > 0 else "—",
+                        "cpf", "cost", inverse=True, color="#D97706"),
+                 unsafe_allow_html=True)
 
 
 def show_trend(df: pd.DataFrame, color: str = "#0077B5") -> None:
