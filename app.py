@@ -73,10 +73,10 @@ def _delta_text(curr: float, prev: float, unit: str = "", inverse: bool = False)
 
 
 def _sparkline_svg(values: list, color: str = "#0077B5") -> str:
-    """產生小型內嵌 SVG 折線圖,給 KPI 卡用。"""
+    """產生小型內嵌 SVG 折線圖,給 KPI 卡右側用。"""
     if not values or len(values) < 2:
         return ""
-    width, height, pad = 100, 28, 3
+    width, height, pad = 90, 40, 4
     min_v, max_v = min(values), max(values)
     if max_v == min_v:
         max_v = min_v + 1
@@ -89,10 +89,10 @@ def _sparkline_svg(values: list, color: str = "#0077B5") -> str:
     last_y = float(pts[-1].split(",")[1])
     return (
         f'<svg width="{width}" height="{height}" '
-        f'style="display:block;margin-top:6px;opacity:0.75">'
-        f'<polyline points="{" ".join(pts)}" stroke="{color}" stroke-width="1.6" '
+        f'style="display:block;opacity:0.8;flex-shrink:0">'
+        f'<polyline points="{" ".join(pts)}" stroke="{color}" stroke-width="1.8" '
         f'fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
-        f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="2.2" fill="{color}"/>'
+        f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="2.5" fill="{color}"/>'
         f'</svg>'
     )
 
@@ -127,20 +127,23 @@ _KPI_CSS = """
 <style>
 .kpi-card{
     background:#fff;border:1px solid #E5E7EB;border-radius:10px;
-    padding:14px 16px;margin-bottom:10px;min-height:138px;
+    padding:10px 14px;margin-bottom:10px;
     box-shadow:0 1px 2px rgba(0,0,0,0.04);
+    display:flex;align-items:center;gap:10px;
+    min-height:84px;
 }
 .kpi-vol{background:#F0F7FF;border-color:#CFE2F8}      /* 規模 / 量體 */
 .kpi-rate{background:#FFFBEB;border-color:#F4E5B8}     /* 比率 */
 .kpi-cost{background:#FFF4EE;border-color:#F8D2BC}     /* 成本(越低越好)*/
-.kpi-label{font-size:12.5px;color:#5C6470;margin-bottom:4px;letter-spacing:0.2px}
-.kpi-value{font-size:24px;font-weight:600;color:#1F2937;line-height:1.15}
-.kpi-delta{font-size:11.5px;margin-top:5px;font-weight:500}
+.kpi-body{flex:1;min-width:0}
+.kpi-label{font-size:13.5px;font-weight:600;color:#1F2937;margin-bottom:2px;letter-spacing:0.2px}
+.kpi-value{font-size:22px;font-weight:700;color:#0F172A;line-height:1.1}
+.kpi-delta{font-size:11.5px;margin-top:3px;font-weight:500}
 .kpi-up-good{color:#15803D}     /* 數字上升且是好事 */
 .kpi-down-good{color:#B91C1C}   /* 數字下降但是壞事 */
 .kpi-up-bad{color:#B91C1C}      /* 數字上升但是壞事(如成本)*/
 .kpi-down-bad{color:#15803D}    /* 數字下降但是好事(如成本)*/
-.kpi-section{font-size:14.5px;font-weight:600;margin:14px 0 6px 0;color:#374151}
+.kpi-section{font-size:15px;font-weight:700;margin:14px 0 8px 0;color:#1F2937}
 </style>
 """
 
@@ -165,9 +168,12 @@ def show_kpis(df: pd.DataFrame, df_prev: pd.DataFrame = None) -> None:
         spark_html = _sparkline_svg(sparks.get(key, []), color=color)
         return (
             f'<div class="kpi-card kpi-{category}">'
+            f'<div class="kpi-body">'
             f'<div class="kpi-label">{label}</div>'
             f'<div class="kpi-value">{value}</div>'
-            f'{delta_html}{spark_html}'
+            f'{delta_html}'
+            f'</div>'
+            f'{spark_html}'
             f'</div>'
         )
 
