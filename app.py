@@ -469,9 +469,8 @@ if len(date_range) == 2:
         & (df_raw["日期"].dt.date <= prev_end)
     ]
 
-if not df_all.empty:
-    last_day = df_all["日期"].max()
-    df_all = df_all[df_all["日期"] < last_day]
+# 註:本機版會排除最後一天因為 CSV 含當天不完整資料,
+# 但雲端版的 Sheet 已由 build_sheet.py 在寫入時排除當天,這裡不需重複排除。
 
 df_eu = df_all[df_all["地區"] == "歐洲"]
 df_la = df_all[df_all["地區"] == "拉美"]
