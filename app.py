@@ -537,9 +537,30 @@ df_raw["類型"] = df_raw["AdID"].map(type_map).fillna("—")
 
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png", width=40)
-    st.title("篩選條件")
+
+    # ── 資料新鮮度區塊 ────────────────────────────────
     min_date = df_raw["日期"].min()
     max_date = df_raw["日期"].max()
+    days_behind = (datetime.now().date() - max_date.date()).days
+    if days_behind <= 1:
+        freshness_icon, freshness_text, freshness_bg = "🟢", "正常", "#E8F8F0"
+    elif days_behind <= 3:
+        freshness_icon, freshness_text, freshness_bg = "🟡", "稍舊", "#FFFBEB"
+    else:
+        freshness_icon, freshness_text, freshness_bg = "🔴", "過期", "#FDEDED"
+    st.markdown(
+        f"""<div style="background:{freshness_bg};padding:10px 12px;border-radius:8px;
+        border:1px solid rgba(0,0,0,0.06);margin-bottom:14px">
+        <div style="font-size:11.5px;color:#6B7280;margin-bottom:2px">資料狀態</div>
+        <div style="font-size:14px;font-weight:600;color:#1F2937">
+        📅 最新:{max_date.strftime('%Y-%m-%d')}</div>
+        <div style="font-size:12px;color:#4B5563;margin-top:2px">
+        {freshness_icon} 距今 {days_behind} 天({freshness_text})</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    st.title("篩選條件")
     # 預設:最新資料當月 1 號 ~ 最新資料日期
     default_end = max_date.date()
     default_start = default_end.replace(day=1)
@@ -562,9 +583,9 @@ with st.sidebar:
         )
         st.caption(f"(同長度 {_len} 天,KPI 卡的 vs 上期是跟這段比)")
     st.markdown("---")
-    st.caption(f"資料範圍：{min_date.strftime('%Y-%m-%d')} ~ {max_date.strftime('%Y-%m-%d')}")
-    st.caption(f"頁面開啟時間：{datetime.now().strftime('%Y/%m/%d %H:%M')}")
-    if st.button("🔄 重新載入資料"):
+    st.caption(f"資料範圍:{min_date.strftime('%Y-%m-%d')} ~ {max_date.strftime('%Y-%m-%d')}")
+    st.caption(f"頁面開啟時間:{datetime.now().strftime('%Y/%m/%d %H:%M')}")
+    if st.button("🔄 重新載入資料", help="清除快取並從 Google Sheet 重新拉資料"):
         st.cache_data.clear()
         st.rerun()
 
