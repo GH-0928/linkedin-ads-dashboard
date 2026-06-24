@@ -540,9 +540,14 @@ with st.sidebar:
     st.title("篩選條件")
     min_date = df_raw["日期"].min()
     max_date = df_raw["日期"].max()
+    # 預設:最新資料當月 1 號 ~ 最新資料日期
+    default_end = max_date.date()
+    default_start = default_end.replace(day=1)
+    if default_start < min_date.date():
+        default_start = min_date.date()
     date_range = st.date_input(
         "日期範圍",
-        value=(min_date.date(), max_date.date()),
+        value=(default_start, default_end),
         min_value=min_date.date(),
         max_value=max_date.date(),
     )
