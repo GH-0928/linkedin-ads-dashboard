@@ -103,7 +103,7 @@ def show_trend(df: pd.DataFrame, color: str = "#0077B5") -> None:
                     anchor="free", position=1.0, ticksuffix="%",
                     tickfont=dict(color="#FF6B6B")),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def show_adset_compare(df: pd.DataFrame) -> None:
@@ -132,7 +132,7 @@ def show_adset_compare(df: pd.DataFrame) -> None:
     )
     disp["互動率(%)"] = disp["互動率(%)"].apply(lambda x: f"{x:.2f}%")
     disp["CPM($)"] = disp["CPM($)"].apply(lambda x: f"${x:.2f}")
-    st.dataframe(disp, use_container_width=True, hide_index=True)
+    st.dataframe(disp, width="stretch", hide_index=True)
 
 
 def show_ad_ranking(df: pd.DataFrame) -> None:
@@ -166,7 +166,7 @@ def show_ad_ranking(df: pd.DataFrame) -> None:
         fig.update_layout(height=380, plot_bgcolor="white", showlegend=False,
                           margin=dict(t=40, b=10),
                           yaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with col2:
         top2 = ad_stats.sort_values("互動率", ascending=True).tail(10)
         fig2 = px.bar(top2, x="互動率", y="素材", orientation="h",
@@ -175,7 +175,7 @@ def show_ad_ranking(df: pd.DataFrame) -> None:
         fig2.update_layout(height=380, plot_bgcolor="white", showlegend=False,
                            margin=dict(t=40, b=10),
                            yaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
 
     st.subheader("📋 素材明細表")
     disp = ad_stats.copy()
@@ -185,7 +185,7 @@ def show_ad_ranking(df: pd.DataFrame) -> None:
     for col in ["花費($)", "CTR(%)", "互動率(%)"]:
         disp[col] = disp[col].round(2)
     disp["CPF($)"] = disp["CPF($)"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "—")
-    st.dataframe(disp, use_container_width=True, height=350)
+    st.dataframe(disp, width="stretch", height=350)
 
 
 def show_alerts(df: pd.DataFrame) -> None:
@@ -315,7 +315,7 @@ def show_weekly_report(df_raw: pd.DataFrame) -> None:
         return [f"background-color: {bg_colors[row.name]}" for _ in row]
 
     styled = table_df.style.apply(apply_bg, axis=1)
-    st.dataframe(styled, hide_index=True, use_container_width=True, height=370)
+    st.dataframe(styled, hide_index=True, width="stretch", height=370)
 
     st.markdown("---")
     st.subheader("🎨 各地區素材表現亮點（本週）")
@@ -365,7 +365,7 @@ def show_weekly_report(df_raw: pd.DataFrame) -> None:
                     disp["CPF($)"] = disp["CPF($)"].apply(
                         lambda x: f"${x:.2f}" if pd.notna(x) else "—"
                     )
-                    st.dataframe(disp, hide_index=True, use_container_width=True)
+                    st.dataframe(disp, hide_index=True, width="stretch")
         st.markdown("")
 
 
@@ -450,17 +450,17 @@ with tab1:
         fig = px.pie(region_stats, values="spent", names="地區", title="花費分布",
                      color="地區", color_discrete_map=REGION_COLORS)
         fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with col2:
         fig2 = px.pie(region_stats, values="impressions", names="地區", title="曝光分布",
                       color="地區", color_discrete_map=REGION_COLORS)
         fig2.update_layout(height=300)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
     with col3:
         fig3 = px.pie(region_stats, values="clicks", names="地區", title="點擊分布",
                       color="地區", color_discrete_map=REGION_COLORS)
         fig3.update_layout(height=300)
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width="stretch")
 
     st.subheader("📋 三區數據對比")
     region_stats["CTR(%)"] = region_stats["CTR"].round(2)
@@ -469,7 +469,7 @@ with tab1:
     region_stats["點擊"] = region_stats["clicks"].astype(int)
     region_stats["觸及"] = region_stats["reach"].astype(int)
     disp_reg = region_stats[["地區", "花費($)", "曝光", "點擊", "CTR(%)", "觸及"]]
-    st.dataframe(disp_reg, use_container_width=True, hide_index=True)
+    st.dataframe(disp_reg, width="stretch", hide_index=True)
 
     st.markdown("---")
     st.subheader("⚠️ 全區警示彙總")
