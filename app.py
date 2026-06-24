@@ -29,32 +29,73 @@ REGION_COLORS = {"歐洲": "#0077B5", "拉美": "#00A651", "非洲": "#E8A020", 
 # ──────────────────────────────────────────────────────────────────────
 #  通用元件
 # ──────────────────────────────────────────────────────────────────────
-def show_kpis(df: pd.DataFrame) -> None:
+def _kpi_pack(df: pd.DataFrame) -> dict:
+    """從 DataFrame 算出所有 KPI 指標的原始數值,供顯示與對比使用。"""
     spent = df["花費"].sum()
     imp = df["曝光"].sum()
     clicks = df["點擊"].sum()
     eng = df["互動"].sum()
     reach = df["觸及"].sum()
     follows = df["追蹤"].sum()
-    ctr = clicks / imp * 100 if imp > 0 else 0
-    eng_rate = eng / imp * 100 if imp > 0 else 0
-    cpm = df["CPM"].mean() if "CPM" in df.columns else 0
-    cpf = spent / follows if follows > 0 else 0
-    cpe = spent / eng if eng > 0 else 0
+    return {
+        "spent": spent,
+        "imp": imp,
+        "clicks": clicks,
+        "eng": eng,
+        "reach": reach,
+        "follows": follows,
+        "ctr": clicks / imp * 100 if imp > 0 else 0,
+        "eng_rate": eng / imp * 100 if imp > 0 else 0,
+        "cpm": df["CPM"].mean() if "CPM" in df.columns and len(df) else 0,
+        "cpf": spent / follows if follows > 0 else 0,
+        "cpe": spent / eng if eng > 0 else 0,
+    }
+
+
+def _delta_text(curr: float, prev: float, unit: str = "", inverse: bool = False):
+    """產生 st.metric 用的 delta 字串。
+
+    Args:
+        curr / prev: 當期與對比期數值
+        unit: 顯示單位字串(例 "$" 或 "%"),目前 metric 內部會自動推斷,可不傳
+        inverse: True 表示「越低越好」(如 CPM、CPE、CPF) → 反向著色
+                 False 表示「越高越好」(如花費、follows) → 正向著色
+    Returns:
+        (delta_str, delta_color) ── delta_color 給 st.metric 的 delta_color 參數
+    """
+    if prev is None or prev == 0:
+        return None, "normal"
+    pct = (curr - prev) / prev * 100
+    sign = "+" if pct >= 0 else ""
+    text = f"{sign}{pct:.1f}% vs 上期"
+    color = "inverse" if inverse else "normal"
+    return text, color
+
+
+def show_kpis(df: pd.DataFrame, df_prev: pd.DataFrame = None) -> None:
+    curr = _kpi_pack(df)
+    prev = _kpi_pack(df_prev) if df_prev is not None and not df_prev.empty else None
+
+    def _m(col, label, value, key, inverse=False):
+        if prev:
+            delta, color = _delta_text(curr[key], prev[key], inverse=inverse)
+            col.metric(label, value, delta=delta, delta_color=color)
+        else:
+            col.metric(label, value)
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("💰 總花費", f"${spent:,.0f}")
-    c2.metric("👁️ 總曝光", f"{imp:,.0f}")
-    c3.metric("🖱️ 總點擊", f"{clicks:,.0f}")
-    c4.metric("👥 觸及人數", f"{reach:,.0f}")
-    c5.metric("📡 平均CPM", f"${cpm:.2f}")
+    _m(c1, "💰 總花費", f"${curr['spent']:,.0f}", "spent")
+    _m(c2, "👁️ 總曝光", f"{curr['imp']:,.0f}", "imp")
+    _m(c3, "🖱️ 總點擊", f"{curr['clicks']:,.0f}", "clicks")
+    _m(c4, "👥 觸及人數", f"{curr['reach']:,.0f}", "reach")
+    _m(c5, "📡 平均CPM", f"${curr['cpm']:.2f}", "cpm", inverse=True)
 
     c6, c7, c8, c9, c10 = st.columns(5)
-    c6.metric("📣 CTR", f"{ctr:.2f}%")
-    c7.metric("❤️ 互動率", f"{eng_rate:.2f}%")
-    c8.metric("💬 CPE", f"${cpe:.2f}" if cpe > 0 else "—")
-    c9.metric("➕ 追蹤數", f"{follows:,.0f}")
-    c10.metric("💎 CPF", f"${cpf:.2f}" if cpf > 0 else "—")
+    _m(c6, "📣 CTR", f"{curr['ctr']:.2f}%", "ctr")
+    _m(c7, "❤️ 互動率", f"{curr['eng_rate']:.2f}%", "eng_rate")
+    _m(c8, "💬 CPE", f"${curr['cpe']:.2f}" if curr['cpe'] > 0 else "—", "cpe", inverse=True)
+    _m(c9, "➕ 追蹤數", f"{curr['follows']:,.0f}", "follows")
+    _m(c10, "💎 CPF", f"${curr['cpf']:.2f}" if curr['cpf'] > 0 else "—", "cpf", inverse=True)
 
 
 def show_trend(df: pd.DataFrame, color: str = "#0077B5") -> None:
@@ -394,6 +435,16 @@ with st.sidebar:
         max_value=max_date.date(),
     )
     st.markdown("---")
+    if len(date_range) == 2:
+        _len = (date_range[1] - date_range[0]).days + 1
+        _prev_end = date_range[0] - pd.Timedelta(days=1)
+        _prev_start = _prev_end - pd.Timedelta(days=_len - 1)
+        st.caption(
+            f"**對比期**:{_prev_start.strftime('%Y-%m-%d')} ~ "
+            f"{_prev_end.strftime('%Y-%m-%d')}"
+        )
+        st.caption(f"(同長度 {_len} 天,KPI 卡的 vs 上期是跟這段比)")
+    st.markdown("---")
     st.caption(f"資料範圍：{min_date.strftime('%Y-%m-%d')} ~ {max_date.strftime('%Y-%m-%d')}")
     st.caption(f"頁面開啟時間：{datetime.now().strftime('%Y/%m/%d %H:%M')}")
     if st.button("🔄 重新載入資料"):
@@ -401,10 +452,20 @@ with st.sidebar:
         st.rerun()
 
 df_all = df_raw.copy()
+df_prev_all = pd.DataFrame()  # 對比期間(同長度往前推)
+
 if len(date_range) == 2:
+    start, end = date_range[0], date_range[1]
     df_all = df_all[
-        (df_all["日期"].dt.date >= date_range[0])
-        & (df_all["日期"].dt.date <= date_range[1])
+        (df_all["日期"].dt.date >= start) & (df_all["日期"].dt.date <= end)
+    ]
+    # 對比期:同長度,緊鄰目前期間之前
+    period_len = (end - start).days + 1
+    prev_end = start - pd.Timedelta(days=1)
+    prev_start = prev_end - pd.Timedelta(days=period_len - 1)
+    df_prev_all = df_raw[
+        (df_raw["日期"].dt.date >= prev_start.date())
+        & (df_raw["日期"].dt.date <= prev_end.date())
     ]
 
 if not df_all.empty:
@@ -414,6 +475,11 @@ if not df_all.empty:
 df_eu = df_all[df_all["地區"] == "歐洲"]
 df_la = df_all[df_all["地區"] == "拉美"]
 df_af = df_all[df_all["地區"] == "非洲"]
+
+# 對比期同樣切三區
+df_prev_eu = df_prev_all[df_prev_all["地區"] == "歐洲"] if not df_prev_all.empty else pd.DataFrame()
+df_prev_la = df_prev_all[df_prev_all["地區"] == "拉美"] if not df_prev_all.empty else pd.DataFrame()
+df_prev_af = df_prev_all[df_prev_all["地區"] == "非洲"] if not df_prev_all.empty else pd.DataFrame()
 
 st.title("📊 TaDa LinkedIn Ads 儀表板")
 st.caption(
@@ -428,7 +494,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 
 with tab1:
     st.subheader("📊 整體 KPI")
-    show_kpis(df_all)
+    show_kpis(df_all, df_prev_all)
     st.markdown("---")
     st.subheader("📈 每日趨勢")
     show_trend(df_all, color="#0077B5")
@@ -475,17 +541,17 @@ with tab1:
     st.subheader("⚠️ 全區警示彙總")
     show_alerts(df_all)
 
-for tab, df_region, label, icon, color_key in [
-    (tab2, df_eu, "歐洲", "🇪🇺", "歐洲"),
-    (tab3, df_la, "拉美", "🌎", "拉美"),
-    (tab4, df_af, "非洲", "🌍", "非洲"),
+for tab, df_region, df_prev_region, label, icon, color_key in [
+    (tab2, df_eu, df_prev_eu, "歐洲", "🇪🇺", "歐洲"),
+    (tab3, df_la, df_prev_la, "拉美", "🌎", "拉美"),
+    (tab4, df_af, df_prev_af, "非洲", "🌍", "非洲"),
 ]:
     with tab:
         if df_region.empty:
             st.warning(f"此期間無{label}資料。")
             continue
         st.subheader(f"{icon} {label} KPI")
-        show_kpis(df_region)
+        show_kpis(df_region, df_prev_region)
         st.markdown("---")
         st.subheader("📈 每日趨勢")
         show_trend(df_region, color=REGION_COLORS[color_key])
